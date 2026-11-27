@@ -4,15 +4,24 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel, EmailStr, Field
 from jose import JWTError, jwt
 from passlib.context import CryptContext
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles # <-- Добавили для фронтенда
 
 app = FastAPI()
 security = HTTPBearer(auto_error=False)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 SECRET = "secret"
 ALGO = "HS256"
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
-# Временная база в памяти
 USERS = {}
 
 class RegisterReq(BaseModel):
@@ -78,3 +87,6 @@ async def update_profile(data: UpdateReq, username: str = Depends(get_user)):
     if data.email: u["email"] = data.email
     if data.name: u["name"] = data.name
     return ProfileRes(username=u["username"], email=u["email"], name=u["name"])
+
+# --- ВОТ ЭТА СТРОКА РАЗДАЕТ ФРОНТЕНД ---
+app.mount("/", StaticFiles(directory=".", html=True), name="static")
