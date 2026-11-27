@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Тестовый Фронтенд</title>
+    <style>
+        body { font-family: Arial, sans-serif; background: #f4f4f9; display: flex; justify-content: center; padding-top: 50px; }
+        .container { background: white; padding: 30px; border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); width: 350px; }
+        h2 { text-align: center; color: #333; margin-bottom: 20px;}
+        .section { margin-bottom: 20px; padding-bottom: 20px; border-bottom: 1px solid #eee; }
+        input { width: 100%; padding: 10px; margin: 5px 0; border: 1px solid #ccc; border-radius: 5px; box-sizing: border-box; }
+        button { width: 100%; padding: 10px; background: #007bff; color: white; border: none; border-radius: 5px; cursor: pointer; margin-top: 10px; font-weight: bold; }
+        button:hover { background: #0056b3; }
+        .btn-danger { background: #dc3545; }
+        .btn-danger:hover { background: #c82333; }
+        .result { margin-top: 15px; padding: 10px; background: #e9ecef; border-radius: 5px; font-size: 14px; word-wrap: break-word; display: none; }
+        .profile-info { font-size: 16px; margin-bottom: 10px; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2>Мой Профиль</h2>
+
+    <!-- Блок Регистрации -->
+    <div class="section" id="register-section">
+        <h3>Регистрация</h3>
+        <input type="text" id="reg-username" placeholder="Логин">
+        <input type="password" id="reg-password" placeholder="Пароль">
+        <input type="email" id="reg-email" placeholder="Email">
+        <input type="text" id="reg-name" placeholder="Имя">
+        <button onclick="register()">Зарегистрироваться</button>
+    </div>
+
+    <!-- Блок Входа -->
+    <div class="section" id="login-section">
+        <h3>Вход</h3>
+        <input type="text" id="login-username" placeholder="Логин">
+        <input type="password" id="login-password" placeholder="Пароль">
+        <button onclick="login()">Войти</button>
+    </div>
+
+    <!-- Блок Профиля (скрыт по умолчанию) -->
+    <div class="section" id="profile-section" style="display: none; border-bottom: none;">
+        <h3>Ваш Профиль</h3>
+        <div class="profile-info" id="profile-data"></div>
+        <input type="email" id="upd-email" placeholder="Новый Email">
+        <input type="text" id="upd-name" placeholder="Новое Имя">
+        <button onclick="updateProfile()">Обновить данные</button>
+        <button class="btn-danger" onclick="logout()" style="margin-top: 15px;">Выйти</button>
+    </div>
+
+    <div class="result" id="result"></div>
+</div>
+
+<script>
+    // Базовый URL нашего API
+    const API_URL = 'http://127.0.0.1:8000/api';
+    let token = null;
+
+    // Функция для вывода результата на экран
+    function showResult(message, isError = false) {
+        const res = document.getElementById('result');
+        res.style.display = 'block';
+        res.style.color = isError ? 'red' : 'green';
+        res.innerText = message;
+    }
+
+    // 1. Регистрация
+    async function register() {
+        const data = {
+            username: document.getElementById('reg-username').value,
+            password: document.getElementById('reg-password').value,
+            email: document.getElementById('reg-email').value,
+            name: document.getElementById('reg-name').value
+        };
+
+        try {
+            const response = await fetch(`${API_URL}/register`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            });
+            const result = await response.json();
+            
+            if (response.ok) {
+                showResult(`Успешная регистрация! Токен: ${result.access_token}`);
+                token = result.access_token;
+                loadProfile();
+            } else {
+                showResult(`Ошибка: ${result.detail || 'Проверьте данные'}`, true);
+            }
+        } catch (e) {
+            showResult('Ошибка сети. Сервер запущен?', true);
+        }
+    }
+
+    // 2. Вход
+    async function login() {
+        const data = {
+            username: document.getElementById('login-username').value,
+            password: document.getElementById('login-password').value
+        };
+
+        try {
+            const response = await fetch(`${API_URL}/login`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            });
+            const result = await response.json();
+
+            if (response.ok) {
+                showResult(`Успешный вход! Токен: ${result.access_token}`);
+                token = result.access_token;
+                loadProfile();
+            } else {
+                showResult(`Ошибка: Неверный логин или пароль`, true);
+            }
+        } catch (e) {
+            showResult('Ошибка сети. Сервер запущен?', true);
+        }
+    }
+
+    // 3. Загрузка профиля
+    async function loadProfile() {
+        if (!token) return;
+
+        try {
+            const response = await fetch(`${API_URL}/profile`, {
+                method: 'GET',
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            
+            if (response.ok) {
+                const profile = await response.json();
+                document.getElementById('profile-data').innerHTML = `
+                    <b>Логин:</b> ${profile.username}<br>
+                    <b>Имя:</b> ${profile.name}<br>
+                    <b>Email:</b> ${profile.email}
+                `;
+                // Скрываем вход/регистрацию, показываем профиль
+                document.getElementById('register-section').style.display = 'none';
+                document.getElementById('login-section').style.display = 'none';
+                document.getElementById('profile-section').style.display = 'block';
+            } else {
+                showResult('Сессия истекла. Войдите заново.', true);
+                logout();
+            }
+        } catch (e) {
+            showResult('Ошибка сети.', true);
+        }
+    }
+
+    // 4. Обновление профиля
+    async function updateProfile() {
+        const newEmail = document.getElementById('upd-email').value;
+        const newName = document.getElementById('upd-name').value;
+
+        const data = {};
+        if (newEmail) data.email = newEmail;
+        if (newName) data.name = newName;
+
+        try {
+            const response = await fetch(`${API_URL}/profile`, {
+                method: 'PUT',
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}` 
+                },
+                body: JSON.stringify(data)
+            });
+
+            if (response.ok) {
+                showResult('Профиль успешно обновлен!');
+                loadProfile(); // Перезагружаем данные
+                // Очищаем поля ввода
+                document.getElementById('upd-email').value = '';
+                document.getElementById('upd-name').value = '';
+            } else {
+                showResult('Ошибка обновления. Проверьте данные.', true);
+            }
+        } catch (e) {
+            showResult('Ошибка сети.', true);
+        }
+    }
+
+    // 5. Выход
+    function logout() {
+        token = null;
+        document.getElementById('profile-section').style.display = 'none';
+        document.getElementById('register-section').style.display = 'block';
+        document.getElementById('login-section').style.display = 'block';
+        document.getElementById('result').style.display = 'none';
+    }
+</script>
+</body>
+</html>
